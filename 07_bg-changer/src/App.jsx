@@ -72,7 +72,7 @@ const App = () => {
           
           <button 
             onClick={() => setColor("zinc")}
-            className="bg-zinc-500 hover:bg-zinc-600 text-white font-semibold px-5 py-2 rounded-3xl transition-colors">
+            className="bg-zinc- hover:bg-zinc-600 text-white font-semibold px-5 py-2 rounded-3xl transition-colors">
               Zinc
           </button>
           
