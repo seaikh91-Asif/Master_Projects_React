@@ -1,10 +1,17 @@
-import React, { useState } from 'react';
-import { ChevronDown, User, ArrowDownUp, ArrowDown, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ChevronDown, User, ArrowDownUp, ArrowDown, ArrowRight, Loader2 } from 'lucide-react';
 import { LineChart, Line, XAxis, ResponsiveContainer } from 'recharts';
 
-// ==========================================
-// 1. Mock Data for Chart & Exchange Rates
-// ==========================================
+// Supported Currencies with Emojis
+const CURRENCIES = [
+  { code: 'AUD', flag: '🇦🇺', name: 'Australian Dollar' },
+  { code: 'USD', flag: '🇺🇸', name: 'US Dollar' },
+  { code: 'INR', flag: '🇮🇳', name: 'Indian Rupee' },
+  { code: 'GBP', flag: '🇬🇧', name: 'British Pound' },
+  { code: 'EUR', flag: '🇪🇺', name: 'Euro' },
+  { code: 'CAD', flag: '🇨🇦', name: 'Canadian Dollar' },
+];
+
 const chartData = [
   { name: 'MON', uv: 400, pv: 240 },
   { name: 'TUE', uv: 300, pv: 450 },
@@ -14,22 +21,38 @@ const chartData = [
   { name: 'SAT', uv: 450, pv: 350 },
 ];
 
-const exchangeRates = {
-  AUD: { USD: 0.657, rateText: "1 AUD = 0.657 USD" },
-  USD: { AUD: 1.522, rateText: "1 USD = 1.522 AUD" }
-};
+// ==========================================
+// 1. Reusable Currency Input Component
+// ==========================================
+function CurrencyInput({ 
+  currency, 
+  onCurrencyChange, 
+  amount, 
+  onAmountChange, 
+  readOnly = false 
+}) {
+  const currentObj = CURRENCIES.find((c) => c.code === currency) || CURRENCIES[0];
 
-// ==========================================
-// 2. Reusable Currency Input Component
-// ==========================================
-function CurrencyInput({ flag, currency, amount, onAmountChange, readOnly }) {
   return (
     <div className="bg-gray-50 rounded-2xl p-4 flex justify-between items-center border border-gray-100 focus-within:border-[#a3e635] transition-colors">
-      <div className="flex items-center gap-2 cursor-pointer">
-        <span className="text-xl">{flag}</span>
-        <span className="font-semibold text-lg">{currency}</span>
-        <ChevronDown size={16} className="text-gray-400" />
+      {/* Currency Selector */}
+      <div className="relative flex items-center gap-2">
+        <span className="text-xl">{currentObj.flag}</span>
+        <select
+          value={currency}
+          onChange={(e) => onCurrencyChange && onCurrencyChange(e.target.value)}
+          className="appearance-none bg-transparent font-semibold text-lg text-gray-800 outline-none pr-6 cursor-pointer"
+        >
+          {CURRENCIES.map((item) => (
+            <option key={item.code} value={item.code}>
+              {item.code}
+            </option>
+          ))}
+        </select>
+        <ChevronDown size={16} className="text-gray-400 absolute right-0 pointer-events-none" />
       </div>
+
+      {/* Amount Input */}
       <input
         type="number"
         value={amount}
@@ -43,7 +66,7 @@ function CurrencyInput({ flag, currency, amount, onAmountChange, readOnly }) {
 }
 
 // ==========================================
-// 3. Dashboard Component (Left Side)
+// 2. Dashboard Component (Left Side)
 // ==========================================
 function Dashboard() {
   return (
@@ -79,9 +102,9 @@ function Dashboard() {
       <div className="h-48 w-full mt-4">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
-            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 10}} dy={10} />
-            <Line type="monotone" dataKey="uv" stroke="#84cc16" strokeWidth={2.5} dot={{r: 4, strokeWidth: 2, fill: '#fff'}} />
-            <Line type="monotone" dataKey="pv" stroke="#f97316" strokeWidth={2.5} dot={{r: 4, strokeWidth: 2, fill: '#fff'}} />
+            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#9ca3af', fontSize: 10 }} dy={10} />
+            <Line type="monotone" dataKey="uv" stroke="#84cc16" strokeWidth={2.5} dot={{ r: 4, strokeWidth: 2, fill: '#fff' }} />
+            <Line type="monotone" dataKey="pv" stroke="#f97316" strokeWidth={2.5} dot={{ r: 4, strokeWidth: 2, fill: '#fff' }} />
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -90,62 +113,90 @@ function Dashboard() {
 }
 
 // ==========================================
-// 4. Converter Component (Right Side - Functional)
+// 3. Converter Component (Right Side - with Live API)
 // ==========================================
 function Converter() {
+  const [fromCurrency, setFromCurrency] = useState('AUD');
+  const [toCurrency, setToCurrency] = useState('USD');
   const [amount, setAmount] = useState(10129.82);
-  const [isReversed, setIsReversed] = useState(false);
+  const [rates, setRates] = useState({});
+  const [loading, setLoading] = useState(false);
 
-  // Dynamic values based on Swap State
-  const fromCurrency = isReversed ? 'USD' : 'AUD';
-  const toCurrency = isReversed ? 'AUD' : 'USD';
-  const fromFlag = isReversed ? '🇺🇸' : '🇦🇺';
-  const toFlag = isReversed ? '🇦🇺' : '🇺🇸';
+  // Live API Fetch Effect
+  useEffect(() => {
+    async function fetchRates() {
+      try {
+        setLoading(true);
+        const base = fromCurrency.toLowerCase();
+        const res = await fetch(`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/${base}.json`);
+        const data = await res.json();
+        setRates(data[base] || {});
+      } catch (error) {
+        console.error("Failed to fetch exchange rates:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
 
-  const rate = exchangeRates[fromCurrency][toCurrency];
-  const rateText = exchangeRates[fromCurrency].rateText;
-  
-  // Convert amount and handle empty string gracefully
-  const convertedAmount = amount ? (Number(amount) * rate).toFixed(2) : "";
+    fetchRates();
+  }, [fromCurrency]);
 
+  // Current Exchange Rate calculation
+  const targetRate = rates[toCurrency.toLowerCase()] || 0;
+  const convertedAmount = amount && targetRate ? (Number(amount) * targetRate).toFixed(2) : '0.00';
+
+  // Swap handler
   const handleSwap = () => {
-    setIsReversed(!isReversed);
+    setFromCurrency(toCurrency);
+    setToCurrency(fromCurrency);
   };
 
   return (
     <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-gray-100 w-full max-w-sm">
       <h2 className="text-2xl font-semibold text-gray-900 mb-1">Sell {fromCurrency}</h2>
-      <p className="text-gray-500 text-sm mb-8">{rateText}</p>
+      
+      {/* Live Rate display */}
+      <p className="text-gray-500 text-sm mb-8 flex items-center gap-1.5 h-5">
+        {loading ? (
+          <>
+            <Loader2 size={14} className="animate-spin text-gray-400" />
+            <span>Fetching live rate...</span>
+          </>
+        ) : (
+          `1 ${fromCurrency} = ${targetRate ? targetRate.toFixed(4) : '...'} ${toCurrency}`
+        )}
+      </p>
 
       <div className="relative mb-8 flex flex-col gap-4">
-        {/* Input for user to type */}
-        <CurrencyInput 
-          flag={fromFlag} 
-          currency={fromCurrency} 
-          amount={amount} 
-          onAmountChange={setAmount} 
-          readOnly={false}
+        {/* From Currency Input */}
+        <CurrencyInput
+          currency={fromCurrency}
+          onCurrencyChange={setFromCurrency}
+          amount={amount}
+          onAmountChange={setAmount}
         />
 
         {/* Swap Button */}
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 bg-white p-1 rounded-full">
-          <button 
+          <button
             onClick={handleSwap}
+            title="Swap Currencies"
             className="bg-[#a3e635] p-2 rounded-full text-black shadow-sm hover:bg-[#92d42b] transition-transform active:scale-95"
           >
-            <ArrowDown size={16} className={isReversed ? "rotate-180 transition-transform" : "transition-transform"} />
+            <ArrowDown size={16} />
           </button>
         </div>
 
-        {/* Read-only output */}
-        <CurrencyInput 
-          flag={toFlag} 
-          currency={toCurrency} 
-          amount={convertedAmount} 
+        {/* To Currency Input (Read Only) */}
+        <CurrencyInput
+          currency={toCurrency}
+          onCurrencyChange={setToCurrency}
+          amount={convertedAmount}
           readOnly={true}
         />
       </div>
 
+      {/* Action Button */}
       <button className="w-full bg-[#a3e635] hover:bg-[#92d42b] text-gray-900 font-medium py-4 px-6 rounded-2xl flex justify-between items-center transition-colors active:scale-[0.98]">
         <span>Sell {amount || 0} {fromCurrency}</span>
         <ArrowRight size={20} />
@@ -155,7 +206,7 @@ function Converter() {
 }
 
 // ==========================================
-// 5. Main App Component (Default Export)
+// 4. Main Export
 // ==========================================
 export default function App() {
   return (
