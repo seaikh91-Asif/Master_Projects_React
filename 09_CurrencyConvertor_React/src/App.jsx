@@ -137,6 +137,8 @@ function Converter() {
           </button>
         </div>
 
+        
+
         {/* Read-only output */}
         <CurrencyInput 
           flag={toFlag} 
