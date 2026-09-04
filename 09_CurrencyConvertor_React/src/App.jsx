@@ -19,6 +19,8 @@ const exchangeRates = {
   USD: { AUD: 1.522, rateText: "1 USD = 1.522 AUD" }
 };
 
+// this is comment
+
 // ==========================================
 // 2. Reusable Currency Input Component
 // ==========================================
